@@ -12,7 +12,7 @@ import flow_toolbox as flow
 
 def main():
     seed = 2001
-    dim = (N, M) = (200, 200)
+    dim = (N, M) = (400, 400)
 
     noise1 = PerlinNoise(octaves=5, seed=seed)
     noise2 = PerlinNoise(octaves=10, seed=seed)
@@ -22,6 +22,9 @@ def main():
         for j in range(M):
             K[i, j] += 2 / 3 * noise1([i / (N - 1), j / (M - 1)])
             K[i, j] += 1 / 3 * noise2([i / (N - 1), j / (M - 1)])
+
+    K[:, 0] *= 0
+    K[:, -1] *= 0
     K *= 10
     K *= K
     K += .001
