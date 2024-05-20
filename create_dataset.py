@@ -83,14 +83,8 @@ def sample_creation_worker(shape, permeability_range, boundary_pressure_range, s
     y = np.array([pressure])
     sample_queue.put((x, y))
 
-def main():
-    visualize = True
-
-    n_samples = 10
-    seed = 1000
-    dim = (N, M) = (100, 100)
-    perm_range = (0.001, 100)
-    boundary_p_range = (0, 100)
+def create_samples_multiproc(n_samples, shape, permeability_range, boundary_pressure_range, seed):
+    ''' creates n_samples training samples using multiprocessing. CAUTION: high ram usage for large n_sample'''
 
     np.random.seed(seed)
     seed_array = np.random.randint(1, 100000, size=n_samples)
@@ -99,7 +93,7 @@ def main():
     sample_queue = multiprocessing.Manager().Queue()
 
     for i in range(n_samples):
-        process = multiprocessing.Process(target=sample_creation_worker, args=(dim, perm_range, boundary_p_range, sample_queue, int(seed_array[i])))
+        process = multiprocessing.Process(target=sample_creation_worker, args=(shape, permeability_range, boundary_pressure_range, sample_queue, int(seed_array[i])))
         processes.append(process)
         process.start()
 
@@ -110,33 +104,51 @@ def main():
     while not sample_queue.empty():
         samples.append(sample_queue.get())
 
+    return samples
+
+def view_darcy(samples):
+    ''' plots visualizations of provided data'''
+
+    for sample in samples:
+        x, y = sample
+
+        perm = x[0]
+        bound = x[1]
+        pressure = y[0]
+
+        K = perm[1:-1, 1:-1]
+        permeability = flow.create_continuous_permeability(K)
+
+        u, v = permeability.compute_uv(pressure)
+        gu = flow.on_cell(u, 0)
+        gv = flow.on_cell(v, 1)
+        speed = np.sqrt(gu * gu + gv * gv)
+
+        pressure = pressure[1:-1, 1:-1]
+
+        plt.figure()
+        plt.imshow(K, cmap='plasma', interpolation='nearest')
+        plt.figure()
+        plt.imshow(bound, cmap='viridis', interpolation='nearest')
+        plt.figure()
+        plt.imshow(pressure, cmap='viridis', interpolation='nearest')
+        plt.contour(K, 5, cmap='plasma')
+        plt.quiver(gv, gu, pivot='mid', angles='xy')
+        plt.show()
+
+def main():
+    visualize = True
+
+    n_samples = 1
+    seed = 1
+    dim = (N, M) = (100, 100)
+    perm_range = (0.001, 100)
+    boundary_p_range = (0, 100)
+
+    samples = create_samples_multiproc(n_samples, dim, perm_range, boundary_p_range, seed)
+    
     if visualize:
-        for sample in samples:
-            x, y = sample
-
-            perm = x[0]
-            bound = x[1]
-            pressure = y[0]
-
-            K = perm[1:-1, 1:-1]
-            permeability = flow.create_continuous_permeability(K)
-
-            u, v = permeability.compute_uv(pressure)
-            gu = flow.on_cell(u, 0)
-            gv = flow.on_cell(v, 1)
-            speed = np.sqrt(gu * gu + gv * gv)
-
-            pressure = pressure[1:-1, 1:-1]
-
-            plt.figure()
-            plt.imshow(K, cmap='viridis', interpolation='nearest')
-            plt.figure()
-            plt.imshow(bound, cmap='viridis', interpolation='nearest')
-            plt.figure()
-            plt.imshow(pressure, cmap='viridis', interpolation='nearest')
-            plt.contour(K, 10, cmap='plasma')
-            plt.quiver(gv, gu, pivot='mid', angles='xy')
-            plt.show()
+        view_darcy(samples)
 
 if __name__ == "__main__":
     main()
