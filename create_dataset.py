@@ -137,16 +137,42 @@ def view_darcy(samples):
         plt.show()
 
 def main():
-    visualize = True
+    visualize = False
 
-    n_samples = 1
+    n_samples = 256
+    multiproc_batch_size = 32
+    n_multiproc_steps = n_samples // multiproc_batch_size
     seed = 1
-    dim = (N, M) = (100, 100)
+    dim = (N, M) = (128, 128)
     perm_range = (0.001, 100)
     boundary_p_range = (0, 100)
 
-    samples = create_samples_multiproc(n_samples, dim, perm_range, boundary_p_range, seed)
+    np.random.seed(seed)
+    seed_array = np.random.randint(1, 100000, size=multiproc_batch_size)
+    samples = []
+    for i in range(n_multiproc_steps):
+        print(i)
+        samples += create_samples_multiproc(multiproc_batch_size, dim, perm_range, boundary_p_range, seed_array[i])
     
+    data_x = []
+    data_y = []
+    for sample in samples:
+        x, y = sample
+        data_x.append(x)
+        data_y.append(y)
+    
+    data_x = np.array(data_x)
+    data_y = np.array(data_y)
+
+    data_x = torch.from_numpy(data_x)
+    data_y = torch.from_numpy(data_y)
+
+    data = dict()
+    data['x'] = data_x
+    data['y'] = data_y
+
+    torch.save(data, 'training_samples_128.pt')
+
     if visualize:
         view_darcy(samples)
 
