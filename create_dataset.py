@@ -34,7 +34,7 @@ def create_sq_perlin_noise(octaves, intensities, shape, value_range, seed=None):
     min_value, max_value = value_range
 
     K /= np.sum(intensities)
-    K *= K
+    #K *= K
     #K = 1 - K
     minK = np.min(K)
     maxK = np.max(K)
@@ -45,7 +45,7 @@ def create_sq_perlin_noise(octaves, intensities, shape, value_range, seed=None):
 
     return K
 
-def create_training_sample(shape, permeability_range, boundary_pressure_range, seed):
+def create_training_sample(shape, permeability_range, boundary_pressure_range, seed, boundary_mode="multi_channel"):
     ''' creates one training sample'''
 
     np.random.seed(seed)
@@ -73,14 +73,22 @@ def create_training_sample(shape, permeability_range, boundary_pressure_range, s
     # solve Darcy's flow equation for these parameters
     pressure = flow.better_solve_for_pressure(permeability, boundary_conditions)
 
-    return permeability.K2D, boundary_conditions, pressure
+    # create boundary conditions that make sense in fourier space
+    if boundary_mode == "single_channel":
+        boundary_input = [flow.create_boundary_input(boundary_conditions)]
+    elif boundary_mode == "multi_channel":
+        boundary_input = flow.create_boundary_input_multi_channel(boundary_conditions)
+    else:
+        raise ValueError("Invalid boundary mode '" + str(boundary_mode) + "' , accepted modes are 'single_channel' and 'multi_channel'")
+
+    return [permeability.K2D] + boundary_input, [pressure]
 
 def sample_creation_worker(shape, permeability_range, boundary_pressure_range, sample_queue, seed):
     ''' adds one new sample to the provided queue. Intended for use with multiprocessing.'''
 
-    perm, bound, pressure = create_training_sample(shape, permeability_range, boundary_pressure_range, seed)
-    x = np.array([perm, bound])
-    y = np.array([pressure])
+    x, y = create_training_sample(shape, permeability_range, boundary_pressure_range, seed)
+    x = np.array(x)
+    y = np.array(y)
     sample_queue.put((x, y))
 
 def create_samples_multiproc(n_samples, shape, permeability_range, boundary_pressure_range, seed):
@@ -113,7 +121,7 @@ def view_darcy(samples):
         x, y = sample
 
         perm = x[0]
-        bound = x[1]
+        bound = x[1:]
         pressure = y[0]
 
         K = perm[1:-1, 1:-1]
@@ -129,31 +137,37 @@ def view_darcy(samples):
         plt.figure()
         plt.imshow(K, cmap='plasma', interpolation='nearest')
         plt.figure()
-        plt.imshow(bound, cmap='viridis', interpolation='nearest')
-        plt.figure()
         plt.imshow(pressure, cmap='viridis', interpolation='nearest')
         plt.contour(K, 5, cmap='plasma')
         plt.quiver(gv, gu, pivot='mid', angles='xy')
+        '''for boundary in bound:
+            plt.figure()
+            plt.imshow(boundary, cmap='viridis', interpolation='nearest')'''
         plt.show()
 
 def main():
     visualize = False
 
-    n_samples = 256
+    n_samples = 32
     multiproc_batch_size = 32
     n_multiproc_steps = n_samples // multiproc_batch_size
     seed = 1
-    dim = (N, M) = (128, 128)
+    dim = (N, M) = (256, 256)
     perm_range = (0.001, 100)
     boundary_p_range = (0, 100)
 
     np.random.seed(seed)
-    seed_array = np.random.randint(1, 100000, size=multiproc_batch_size)
+    seed_array = np.random.randint(1, 100000, size=n_multiproc_steps)
     samples = []
+    progress = 0
+    print("generating samples")
     for i in range(n_multiproc_steps):
-        print(i)
+        perc = int(100 * i / (n_multiproc_steps))
+        if perc != progress:
+            print(str(perc) + "%")
+            progress = perc
         samples += create_samples_multiproc(multiproc_batch_size, dim, perm_range, boundary_p_range, seed_array[i])
-    
+    print("saving samples")
     data_x = []
     data_y = []
     for sample in samples:
@@ -171,7 +185,8 @@ def main():
     data['x'] = data_x
     data['y'] = data_y
 
-    torch.save(data, 'training_samples_128.pt')
+    torch.save(data, 'training_samples_256_simple_mc.pt')
+    print("samples saved")
 
     if visualize:
         view_darcy(samples)
