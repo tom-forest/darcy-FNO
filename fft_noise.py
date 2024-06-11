@@ -16,7 +16,8 @@ class fft_noise:
         self.rng = np.random.default_rng(seed=seed)
 
     def __call__(self, shape):
-        
+        ''' Returns noise evaluated on a grid of the provided shape'''
+
         # generate signals
         amp = self.rng.uniform(0, 1, shape)
         phase = self.rng.uniform(0, 2 * np.pi, shape)

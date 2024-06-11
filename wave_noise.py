@@ -67,18 +67,16 @@ class Wave_noise:
 
 
 def main():
-    seed = 1
+    seed = 3
 
     freq = []
-    for i in range(40):
-        freq.append(pow(2, i+2))
+    for i in range(1, 101):
+        freq.append(i)
     a = Wave_noise(freq, seed=seed)
+    b = a((1000, 1000))
 
-    for i in range(3):
-        b = a((1000, 1000))
-
-        plt.imshow(b)
-        plt.show()
+    plt.imshow(b)
+    plt.show()
 
 if __name__ == "__main__":
     main()
