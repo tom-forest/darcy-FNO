@@ -4,11 +4,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 
-model = torch.load("mc_model_v2.pt")
+model = torch.load("fft_model_v2.pt")
 model.eval()
 train_loader, test_loader, data_processor = load_samples(
-        file_name='training_samples_64_simple_mc.pt',
-        n_train=4000, batch_size=30, 
+        file_name='training_samples_128_fft.pt',
+        n_train=1000, batch_size=30, 
         n_test=31,
         test_batch_size=32,
         positional_encoding=True,
@@ -18,7 +18,7 @@ train_loader, test_loader, data_processor = load_samples(
 
 data_processor.eval()
 data_processor.train = None
-data = test_loader.dataset[0]
+data = test_loader.dataset[2]
 x = np.copy(data["x"])
 y = np.copy(data["y"].squeeze())
 data = data_processor.preprocess(data, batched=False)

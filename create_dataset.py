@@ -4,6 +4,7 @@ import numpy as np
 import sys
 import os
 from perlin_noise import PerlinNoise
+from fft_noise import fft_noise
 import multiprocessing
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -11,9 +12,22 @@ target_dir = os.path.abspath(os.path.join(current_dir, '..', 'Code_Permeability'
 sys.path.append(target_dir)
 import flow_toolbox as flow
 
-def create_sq_perlin_noise(octaves, intensities, shape, value_range, seed=None):
-    ''' creates a random matrix using squared Perlin noise
-        permeability range is a tuple of form (min permability, max permeability)'''
+
+def scale_array(A, value_range):
+    ''' linear scaling of the array's values to fit the (min, max) tuple given by value_range'''
+
+    min_value, max_value = value_range
+
+    minA = np.min(A)
+    maxA = np.max(A)
+    A -= minA
+    A /= maxA - minA
+    A *= max_value - min_value
+    A += min_value
+
+
+def create_perlin_noise(octaves, intensities, shape, seed=None):
+    ''' creates a random matrix using Perlin noise'''
 
     nf = len(octaves)
     assert len(intensities) == nf
@@ -31,22 +45,12 @@ def create_sq_perlin_noise(octaves, intensities, shape, value_range, seed=None):
             for k in range(nf):
                 K[i, j] += intensities[k] * noise[k]([i / (N - 1), j / (M - 1)])
 
-    min_value, max_value = value_range
-
     K /= np.sum(intensities)
-    #K *= K
-    #K = 1 - K
-    minK = np.min(K)
-    maxK = np.max(K)
-    K -= minK
-    K /= maxK - minK
-    K *= max_value - min_value
-    K += min_value
 
     return K
 
-def create_training_sample(shape, permeability_range, boundary_pressure_range, seed, boundary_mode="multi_channel"):
-    ''' creates one training sample'''
+def create_perlin_sample(shape, permeability_range, boundary_pressure_range, seed, boundary_mode="multi_channel"):
+    ''' creates one training sample using perlin noise'''
 
     np.random.seed(seed)
 
@@ -61,19 +65,43 @@ def create_training_sample(shape, permeability_range, boundary_pressure_range, s
     octaves = np.random.uniform(min_octave, max_octave, size=n_octave)
     intensities = 1 / octaves
 
-    K = create_sq_perlin_noise(octaves, intensities, shape, permeability_range, seed)
+    K = create_perlin_noise(octaves, intensities, shape, permeability_range, seed)
+
+    return create_sample(K, permeability_range, boundary_pressure_range, seed, boundary_mode)
+
+
+def create_fft_sample(shape, permeability_range, boundary_pressure_range, seed, boundary_mode="multi_channel"):
+    ''' creates one training sample using fft noise'''
+
+    # fft noise supports custom energy spectrums. Check fft_noise.py for more information.
+    noise_gen = fft_noise(seed=seed)
+    K = noise_gen(shape)
+
+    return create_sample(K, permeability_range, boundary_pressure_range, seed, boundary_mode)
+
+
+def create_sample(K, permeability_range, boundary_pressure_range, seed, boundary_mode="multi_channel"):
+    ''' creates a sample by mapping K to permeability_range to create the permeability
+        and random values within boundary_pressure_range to generate the piece-wise linear
+        boundary conditions.
+        accepted boundary modes are "single_channel" and "multi_channel". Multi-channel is recommended.'''
+    
+
+    # create permeability
+    scale_array(K, permeability_range)
     permeability = flow.create_continuous_permeability(K)
 
     # create boundary pressure conditions
+    rng = np.random.default_rng(seed)
     min_p, max_p = boundary_pressure_range
-    corners = np.random.uniform(min_p, max_p, size=4)
+    corners = rng.uniform(min_p, max_p, size=4)
 
     boundary_conditions = flow.create_boundary_conditions(permeability, corners)
 
     # solve Darcy's flow equation for these parameters
     pressure = flow.better_solve_for_pressure(permeability, boundary_conditions)
 
-    # create boundary conditions that make sense in fourier space
+    # create boundary conditions that still appear in fourier space
     if boundary_mode == "single_channel":
         boundary_input = [flow.create_boundary_input(boundary_conditions)]
     elif boundary_mode == "multi_channel":
@@ -83,15 +111,16 @@ def create_training_sample(shape, permeability_range, boundary_pressure_range, s
 
     return [permeability.K2D] + boundary_input, [pressure]
 
+
 def sample_creation_worker(shape, permeability_range, boundary_pressure_range, sample_queue, seed):
     ''' adds one new sample to the provided queue. Intended for use with multiprocessing.'''
 
-    x, y = create_training_sample(shape, permeability_range, boundary_pressure_range, seed)
+    x, y = create_fft_sample(shape, permeability_range, boundary_pressure_range, seed)
     x = np.array(x)
     y = np.array(y)
     sample_queue.put((x, y))
 
-def create_samples_multiproc(n_samples, shape, permeability_range, boundary_pressure_range, seed):
+def create_dataset_multiproc(n_samples, shape, permeability_range, boundary_pressure_range, seed):
     ''' creates n_samples training samples using multiprocessing. CAUTION: high ram usage for large n_sample'''
 
     np.random.seed(seed)
@@ -146,13 +175,13 @@ def view_darcy(samples):
         plt.show()
 
 def main():
-    visualize = False
+    visualize = True
 
-    n_samples = 32
-    multiproc_batch_size = 32
+    n_samples = 3
+    multiproc_batch_size = 3
     n_multiproc_steps = n_samples // multiproc_batch_size
     seed = 1
-    dim = (N, M) = (256, 256)
+    dim = (N, M) = (64, 64)
     perm_range = (0.001, 100)
     boundary_p_range = (0, 100)
 
@@ -166,7 +195,7 @@ def main():
         if perc != progress:
             print(str(perc) + "%")
             progress = perc
-        samples += create_samples_multiproc(multiproc_batch_size, dim, perm_range, boundary_p_range, seed_array[i])
+        samples += create_dataset_multiproc(multiproc_batch_size, dim, perm_range, boundary_p_range, seed_array[i])
     print("saving samples")
     data_x = []
     data_y = []
@@ -185,7 +214,7 @@ def main():
     data['x'] = data_x
     data['y'] = data_y
 
-    torch.save(data, 'training_samples_256_simple_mc.pt')
+    torch.save(data, 'temp.pt')
     print("samples saved")
 
     if visualize:

@@ -12,6 +12,10 @@ def default_spectrum(coords, p):
 class fft_noise:
 
     def __init__(self, magnitude_map=lambda c:default_spectrum(c,2), seed=None):
+        ''' Creates a Fourier noise generator. magnitude_map is a function taking a single
+        3-dimensional array as input specifying the coordinate grid with shape [X, Y].
+        See line 35 for an example.'''
+
         self.mag = magnitude_map
         self.rng = np.random.default_rng(seed=seed)
 
@@ -39,7 +43,7 @@ class fft_noise:
     
     
 def main():
-    a = fft_noise(seed=1)
+    a = fft_noise(seed=2)
     b = a((1000, 1000))
     plt.imshow(b)
     plt.show()

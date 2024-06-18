@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 device='cpu'
 
 train_loader, test_loader, data_processor = load_samples(
-        file_name='training_samples_64_simple_mc.pt',
-        n_train=4000, batch_size=32, 
+        file_name='training_samples_128_fft.pt',
+        n_train=1000, batch_size=32, 
         n_test=20,
         test_batch_size=32,
         positional_encoding=True,
@@ -18,7 +18,7 @@ train_loader, test_loader, data_processor = load_samples(
 )
 data_processor = data_processor.to(device)
 
-model = TFNO(n_modes=(16, 16), hidden_channels=32, projection_channels=64, factorization='tucker', rank=0.42, in_channels=7)
+model = TFNO(n_modes=(32, 32), hidden_channels=32, projection_channels=64, factorization='tucker', rank=0.42, in_channels=7)
 model = model.to(device)
 
 optimizer = torch.optim.Adam(model.parameters(), 
@@ -90,4 +90,4 @@ plt.tight_layout()
 fig.show()
 fig.savefig('wat2')
 
-torch.save(model, "mc_model_v2.pt")
+torch.save(model, "fft_model_v2.pt")
