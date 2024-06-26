@@ -17,7 +17,8 @@ def load_samples(
     encode_output=True,
     encoding="channel-wise",
 ):
-    """Load the Navier-Stokes dataset"""
+    """ Loads the file_name dataset.
+        There should probably be a separate one just for testing but I reused this to gain time."""
     data = torch.load(file_name)
     x_train = data["x"][0:n_train, :, :].type(torch.float32).clone()
     y_train = data["y"][0:n_train, :, :].clone()

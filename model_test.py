@@ -4,11 +4,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 
-model = torch.load("fft_model_v2.pt")
+model = torch.load("fft_model_v1.pt")
 model.eval()
 train_loader, test_loader, data_processor = load_samples(
-        file_name='training_samples_128_fft.pt',
-        n_train=1000, batch_size=30, 
+        file_name='training_samples_64_fft.pt',
+        n_train=1, batch_size=30, 
         n_test=31,
         test_batch_size=32,
         positional_encoding=True,
@@ -18,7 +18,7 @@ train_loader, test_loader, data_processor = load_samples(
 
 data_processor.eval()
 data_processor.train = None
-data = test_loader.dataset[2]
+data = test_loader.dataset[4]
 x = np.copy(data["x"])
 y = np.copy(data["y"].squeeze())
 data = data_processor.preprocess(data, batched=False)
@@ -31,7 +31,6 @@ out = out.squeeze().detach().numpy()
 
 
 err = np.abs(y - out) / y
-err_bound = np.abs(x[1] - out) / x[1]
 
 fig, axs = plt.subplots(2, 2)
 errplot = axs[0,0].imshow(err, norm=matplotlib.colors.LogNorm())
@@ -54,3 +53,20 @@ fig.colorbar(err_boundplot, ax=axs[1, 0])
 
 fig.suptitle("FNO pressure prediction from permeability field and linear pressure boundary conditions")
 plt.show()
+
+if True:
+	avg = []
+	for data in test_loader.dataset:
+		x = np.copy(data["x"])
+		y = np.copy(data["y"].squeeze())
+		data = data_processor.preprocess(data, batched=False)
+		xpre = data["x"]
+		out = model(xpre.unsqueeze(0))
+		out, data = data_processor.postprocess(out, data)
+		out = out.squeeze().detach().numpy()
+
+		err = np.linalg.norm(y - out)
+		rel_err = err / np.linalg.norm(y)
+		avg.append(rel_err)
+	avg = np.array(avg)
+	print("average relative error over test set: " + str(np.mean(avg)))

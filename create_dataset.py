@@ -65,7 +65,7 @@ def create_perlin_sample(shape, permeability_range, boundary_pressure_range, see
     octaves = np.random.uniform(min_octave, max_octave, size=n_octave)
     intensities = 1 / octaves
 
-    K = create_perlin_noise(octaves, intensities, shape, permeability_range, seed)
+    K = create_perlin_noise(octaves, intensities, shape, seed)
 
     return create_sample(K, permeability_range, boundary_pressure_range, seed, boundary_mode)
 
@@ -115,7 +115,7 @@ def create_sample(K, permeability_range, boundary_pressure_range, seed, boundary
 def sample_creation_worker(shape, permeability_range, boundary_pressure_range, sample_queue, seed):
     ''' adds one new sample to the provided queue. Intended for use with multiprocessing.'''
 
-    x, y = create_fft_sample(shape, permeability_range, boundary_pressure_range, seed)
+    x, y = create_perlin_sample(shape, permeability_range, boundary_pressure_range, seed)
     x = np.array(x)
     y = np.array(y)
     sample_queue.put((x, y))
@@ -175,13 +175,13 @@ def view_darcy(samples):
         plt.show()
 
 def main():
-    visualize = True
+    visualize = False
 
-    n_samples = 3
-    multiproc_batch_size = 3
+    n_samples = 32
+    multiproc_batch_size = 32
     n_multiproc_steps = n_samples // multiproc_batch_size
     seed = 1
-    dim = (N, M) = (64, 64)
+    dim = (N, M) = (256, 256)
     perm_range = (0.001, 100)
     boundary_p_range = (0, 100)
 
