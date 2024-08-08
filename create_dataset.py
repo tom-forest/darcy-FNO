@@ -7,10 +7,17 @@ from perlin_noise import PerlinNoise
 from fft_noise import fft_noise
 import multiprocessing
 
+''' Run this file and edit the main function parameters to create
+    datasets tailored to the neuraloperator' FNO models.'''
+
+
 current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# change 'Code_Permeability' to the name of the folder containing Debreu's permeability solver
 target_dir = os.path.abspath(os.path.join(current_dir, '..', 'Code_Permeability'))
+
 sys.path.append(target_dir)
-import flow_toolbox as flow
+import flow_toolbox as flow  # your IDE might display an import unresolved error here but it's actually okay
 
 
 def scale_array(A, value_range):
@@ -175,6 +182,8 @@ def view_darcy(samples):
         plt.show()
 
 def main():
+    ''' Creates a training dataset'''
+
     visualize = False
 
     n_samples = 32
